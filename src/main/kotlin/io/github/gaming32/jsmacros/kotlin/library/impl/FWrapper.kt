@@ -13,14 +13,68 @@ import kotlin.script.experimental.jvmhost.BasicJvmScriptingHost
 
 @Library(value = "JavaWrapper", languages = [KotlinLanguageDefinition::class])
 class FWrapper(context: KotlinScriptContext, language: Class<out BaseLanguage<BasicJvmScriptingHost, KotlinScriptContext>>) :
-    PerExecLanguageLibrary<BasicJvmScriptingHost, KotlinScriptContext>(context, language), IFWrapper<Any> {
+    PerExecLanguageLibrary<BasicJvmScriptingHost, KotlinScriptContext>(context, language), IFWrapper<Function<*>> {
 
-    override fun <A : Any, B : Any, R : Any> methodToJava(p0: Any): MethodWrapper<A, B, R, *> {
+    override fun <A : Any, B : Any, R : Any> methodToJava(p0: Function<*>): MethodWrapper<A, B, R, *> {
         return KotlinMethodWrapper(ctx, true, p0)
     }
 
-    override fun <A : Any, B : Any, R : Any> methodToJavaAsync(p0: Any): MethodWrapper<A, B, R, *> {
+    override fun <A : Any, B : Any, R : Any> methodToJavaAsync(p0: Function<*>): MethodWrapper<A, B, R, *> {
         return KotlinMethodWrapper(ctx, false, p0)
+    }
+
+    fun methodToJava(p0: () -> Unit) : MethodWrapper<*, *, *, *> {
+        return KotlinMethodWrapper<Unit, Unit, Unit>(ctx, true, p0)
+    }
+
+    fun methodToJavaAsync(p0: () -> Unit) : MethodWrapper<*, *, *, *> {
+        return KotlinMethodWrapper<Unit, Unit, Unit>(ctx, false, p0)
+    }
+
+    @JvmName("methodToJavaReturning")
+    fun <R: Any> methodToJava(p0: () -> R) : MethodWrapper<*, *, R, *> {
+        return KotlinMethodWrapper<Unit, Unit, R>(ctx, true, p0)
+    }
+
+    @JvmName("methodToJavaReturningAsync")
+    fun <R: Any> methodToJavaAsync(p0: () -> R) : MethodWrapper<*, *, R, *> {
+        return KotlinMethodWrapper<Unit, Unit, R>(ctx, false, p0)
+    }
+
+    fun <A: Any> methodToJava(p0: (A) -> Unit) : MethodWrapper<A, Unit, Unit, *> {
+        return KotlinMethodWrapper<A, Unit, Unit>(ctx, true, p0)
+    }
+
+    fun <A: Any> methodToJavaAsync(p0: (A) -> Unit) : MethodWrapper<A, Unit, Unit, *> {
+        return KotlinMethodWrapper<A, Unit, Unit>(ctx, false, p0)
+    }
+
+    @JvmName("methodToJavaReturning")
+    fun <A: Any, R: Any> methodToJava(p0: (A) -> R) : MethodWrapper<A, Unit, R, *> {
+        return KotlinMethodWrapper<A, Unit, R>(ctx, true, p0)
+    }
+
+    @JvmName("methodToJavaReturningAsync")
+    fun <A: Any, R: Any> methodToJavaAsync(p0: (A) -> R) : MethodWrapper<A, Unit, R, *> {
+        return KotlinMethodWrapper<A, Unit, R>(ctx, false, p0)
+    }
+
+    fun <A: Any, B: Any> methodToJava(p0: (A, B) -> Unit) : MethodWrapper<A, B, Unit, *> {
+        return KotlinMethodWrapper<A, B, Unit>(ctx, true, p0)
+    }
+
+    fun <A: Any, B: Any> methodToJavaAsync(p0: (A, B) -> Unit) : MethodWrapper<A, B, Unit, *> {
+        return KotlinMethodWrapper<A, B, Unit>(ctx, false, p0)
+    }
+
+    @JvmName("methodToJavaReturning")
+    fun <A: Any, B: Any, R: Any> methodToJava(p0: (A, B) -> R) : MethodWrapper<A, B, R, *> {
+        return KotlinMethodWrapper<A, B, R>(ctx, true, p0)
+    }
+
+    @JvmName("methodToJavaReturningAsync")
+    fun <A: Any, B: Any, R: Any> methodToJavaAsync(p0: (A, B) -> R) : MethodWrapper<A, B, R, *> {
+        return KotlinMethodWrapper<A, B, R>(ctx, false, p0)
     }
 
     override fun stop() {
@@ -75,7 +129,23 @@ private class KotlinMethodWrapper<T : Any, U : Any, R : Any>(ctx: KotlinScriptCo
     }
 
     override fun apply(p0: T): R {
-        TODO("Not yet implemented")
+        if (ctx.boundThreads.contains(Thread.currentThread())) {
+            return (fn as (T) -> R)(p0)
+        }
+
+        try {
+            ctx.bindThread(Thread.currentThread())
+            if (Core.getInstance().profile.checkJoinedThreadStack()) {
+                Core.getInstance().profile.joinedThreadStack.add(Thread.currentThread())
+            }
+            return (fn as (T) -> R)(p0)
+        } catch (e: Throwable) {
+            throw RuntimeException(e)
+        } finally {
+            ctx.releaseBoundEventIfPresent(Thread.currentThread())
+            ctx.unbindThread(Thread.currentThread())
+            Core.getInstance().profile.joinedThreadStack.remove(Thread.currentThread())
+        }
     }
 
     override fun apply(p0: T, p1: U): R {

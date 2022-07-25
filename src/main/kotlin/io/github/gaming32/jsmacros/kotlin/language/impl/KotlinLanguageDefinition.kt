@@ -7,11 +7,10 @@ import xyz.wagyourtail.jsmacros.core.extensions.Extension
 import xyz.wagyourtail.jsmacros.core.language.BaseLanguage
 import xyz.wagyourtail.jsmacros.core.language.EventContainer
 import java.io.File
-import kotlin.script.experimental.api.KotlinType
-import kotlin.script.experimental.api.ScriptCompilationConfiguration
-import kotlin.script.experimental.api.ScriptEvaluationConfiguration
-import kotlin.script.experimental.api.providedProperties
+import kotlin.script.experimental.api.*
 import kotlin.script.experimental.host.toScriptSource
+import kotlin.script.experimental.jvm.dependenciesFromCurrentContext
+import kotlin.script.experimental.jvm.jvm
 import kotlin.script.experimental.jvmhost.BasicJvmScriptingHost
 
 class KotlinLanguageDefinition(extension: Extension, runner: Core<*, *>) :
@@ -26,12 +25,16 @@ class KotlinLanguageDefinition(extension: Extension, runner: Core<*, *>) :
         val libs = retrieveLibs(ctx.ctx)
 
         val compConf = object : ScriptCompilationConfiguration({
+            jvm {
+                // Extract the whole classpath from context classloader and use it as dependencies
+                dependenciesFromCurrentContext(wholeClasspath = true)
+            }
+
             providedProperties.replaceOnlyDefault(mapOf(
-                "event" to KotlinType(BaseEvent::class, isNullable = true),
+                "event" to KotlinType(if (event == null) BaseEvent::class else event::class, isNullable = true),
                 "file" to KotlinType(File::class, isNullable = true),
                 "context" to KotlinType(EventContainer::class)
-            ))
-            providedProperties.replaceOnlyDefault(libs.mapValues { KotlinType(it::class) })
+            ) + libs.mapValues { KotlinType(it.value::class) })
         }) {}
         val execConf = object : ScriptEvaluationConfiguration({
             providedProperties(vars + libs)
@@ -44,14 +47,34 @@ class KotlinLanguageDefinition(extension: Extension, runner: Core<*, *>) :
 
     override fun exec(ctx: EventContainer<KotlinScriptContext>, script: ScriptTrigger, event: BaseEvent?) {
         internalExec(ctx, event) { host, compConf, evalConf ->
-            host.eval(ctx.ctx.file!!.toScriptSource(), compConf, evalConf)
+            val ret = host.eval(ctx.ctx.file!!.toScriptSource(), compConf, evalConf)
+            ret.onFailure {
+                onFail(it)
+            }
         }
     }
 
     override fun exec(ctx: EventContainer<KotlinScriptContext>, lang: String, script: String, event: BaseEvent?) {
         internalExec(ctx, event) { host, compConf, evalConf ->
-            host.eval(script.toScriptSource(), compConf, evalConf)
+            val ret = host.eval(script.toScriptSource(), compConf, evalConf)
+            ret.onFailure {
+                onFail(it)
+            }
         }
+    }
+
+    private fun <R>onFail(it: ResultWithDiagnostics<R>) {
+        var reports = mutableListOf<String>()
+        var exceptions = mutableListOf<Throwable>()
+        for (report in it.reports) {
+            if (report.exception != null) {
+                exceptions.add(report.exception!!)
+                reports.add(report.toString())
+            } else {
+                reports += report.toString()
+            }
+        }
+        throw RuntimeException("Kotlin script failed:\n        ${reports.joinToString("\n        ")}", exceptions.firstOrNull())
     }
 
     override fun createContext(p0: BaseEvent?, p1: File?): KotlinScriptContext {

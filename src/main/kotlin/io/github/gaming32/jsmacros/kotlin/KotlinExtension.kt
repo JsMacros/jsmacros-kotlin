@@ -9,12 +9,33 @@ import xyz.wagyourtail.jsmacros.core.language.BaseWrappedException
 import xyz.wagyourtail.jsmacros.core.library.BaseLibrary
 import java.io.File
 import kotlin.concurrent.thread
+import kotlin.script.experimental.api.ScriptCompilationConfiguration
+import kotlin.script.experimental.api.ScriptEvaluationConfiguration
+import kotlin.script.experimental.api.onFailure
+import kotlin.script.experimental.host.toScriptSource
+import kotlin.script.experimental.jvmhost.BasicJvmScriptingHost
 
 class KotlinExtension : Extension {
     private var languageDefinition: KotlinLanguageDefinition? = null
 
     override fun init() {
         thread {
+            val compConf = object : ScriptCompilationConfiguration({}) {}
+            val evalConf = object : ScriptEvaluationConfiguration({}) {}
+            val ret = BasicJvmScriptingHost().eval("println(\"Kotlin Preloaded!\")".toScriptSource(), compConf, evalConf)
+            ret.onFailure {
+                var reports = mutableListOf<String>()
+                var exceptions = mutableListOf<Throwable>()
+                for (report in it.reports) {
+                    if (report.exception != null) {
+                        exceptions.add(report.exception!!)
+                        reports.add(report.toString())
+                    } else {
+                        reports += report.toString()
+                    }
+                }
+                throw RuntimeException("Kotlin script failed:\n        ${reports.joinToString("\n        ")}", exceptions.firstOrNull())
+            }
         }
     }
 
