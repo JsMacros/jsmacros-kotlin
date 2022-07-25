@@ -10,6 +10,7 @@ import xyz.wagyourtail.jsmacros.core.library.BaseLibrary
 import java.io.File
 import kotlin.concurrent.thread
 import kotlin.script.experimental.api.ScriptCompilationConfiguration
+import kotlin.script.experimental.api.ScriptDiagnostic
 import kotlin.script.experimental.api.ScriptEvaluationConfiguration
 import kotlin.script.experimental.api.onFailure
 import kotlin.script.experimental.host.toScriptSource
@@ -65,7 +66,55 @@ class KotlinExtension : Extension {
 
     override fun getLibraries(): MutableSet<Class<out BaseLibrary>> = mutableSetOf(FWrapper::class.java)
 
-    override fun wrapException(p0: Throwable?): BaseWrappedException<*>? = null
+    override fun wrapException(p0: Throwable?): BaseWrappedException<*>? {
+        if (p0 is KotlinLanguageDefinition.KotlinCompileException) {
+            val nextGetter = p0.resultWithDiagnostics.reports.iterator()
+            return BaseWrappedException(null, "Kotlin script failed to compile", null, if (nextGetter.hasNext()) wrapReport(nextGetter.next(), nextGetter) else null)
+        }
+        if (p0 is KotlinLanguageDefinition.KotlinRuntimeException) {
+            val cause = p0.cause ?: return null
+            val nextGetter = cause.stackTrace.iterator()
+            var message: String = cause.javaClass.simpleName
+            val intMessage: String? = cause.message
+            if (intMessage != null) {
+                message = "$message: $intMessage"
+            }
+            return BaseWrappedException(cause, message, null, if (nextGetter.hasNext()) wrapStackTrace(p0.file, nextGetter.next(), nextGetter) else null)
+        }
+        return null
+    }
+
+    private fun wrapReport(sd: ScriptDiagnostic, nextGetter: Iterator<ScriptDiagnostic>): BaseWrappedException<ScriptDiagnostic>? {
+        if (sd.severity == ScriptDiagnostic.Severity.DEBUG) {
+            return if (nextGetter.hasNext()) wrapReport(nextGetter.next(), nextGetter) else null
+        }
+        return if (sd.location != null) {
+            val file = sd.sourcePath?.let { File(it) }
+            var startIndex = sd.location!!.start.absolutePos
+            var endIndex = sd.location!!.end?.absolutePos
+            val line = sd.location!!.start.line
+            val column = sd.location!!.start.col
+            if (startIndex == null) startIndex = -1
+            if (endIndex == null) endIndex = -1
+            val loc = BaseWrappedException.GuestLocation(file, startIndex, endIndex, line, column)
+            BaseWrappedException(sd, "    " + sd.severity.toString() + " " + sd.message, loc, if (nextGetter.hasNext()) wrapReport(nextGetter.next(), nextGetter) else null)
+        } else {
+            BaseWrappedException(sd, "    " + sd.severity.toString() + " " + sd.message, null, if (nextGetter.hasNext()) wrapReport(nextGetter.next(), nextGetter) else null)
+        }
+    }
+
+    private fun wrapStackTrace(f: File?, element: StackTraceElement, nextGetter: Iterator<StackTraceElement>): BaseWrappedException<StackTraceElement>? {
+        return if (element.fileName?.endsWith(".kts") == true) {
+            val loc = BaseWrappedException.GuestLocation(f, -1, -1, element.lineNumber, -1)
+            BaseWrappedException(element, " at " + element.className + "." + element.methodName, loc, if (nextGetter.hasNext()) wrapStackTrace(f, nextGetter.next(), nextGetter) else null)
+        } else {
+            if (element.className == "kotlin.script.experimental.jvm.BasicJvmScriptEvaluator") {
+                return null
+            }
+            BaseWrappedException.wrapHostElement(element, if (nextGetter.hasNext()) wrapStackTrace(f, nextGetter.next(), nextGetter) else null)
+        }
+    }
+
 
     override fun isGuestObject(p0: Any?): Boolean = false
 }

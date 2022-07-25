@@ -97,7 +97,7 @@ private class KotlinMethodWrapper<T : Any, U : Any, R : Any>(ctx: KotlinScriptCo
             try {
                 (fn as (T) -> Unit)(p0)
             } catch (e: Throwable) {
-                Core.getInstance().profile.logError(e)
+                Core.getInstance().profile.logError(KotlinLanguageDefinition.KotlinRuntimeException(e, ctx.file))
             } finally {
                 ctx.releaseBoundEventIfPresent(Thread.currentThread())
                 ctx.unbindThread(Thread.currentThread())
@@ -118,7 +118,7 @@ private class KotlinMethodWrapper<T : Any, U : Any, R : Any>(ctx: KotlinScriptCo
             try {
                 (fn as (T, U) -> Unit)(p0, p1)
             } catch (e: Throwable) {
-                Core.getInstance().profile.logError(e)
+                Core.getInstance().profile.logError(KotlinLanguageDefinition.KotlinRuntimeException(e, ctx.file))
             } finally {
                 ctx.releaseBoundEventIfPresent(Thread.currentThread())
                 ctx.unbindThread(Thread.currentThread())
@@ -140,7 +140,7 @@ private class KotlinMethodWrapper<T : Any, U : Any, R : Any>(ctx: KotlinScriptCo
             }
             return (fn as (T) -> R)(p0)
         } catch (e: Throwable) {
-            throw RuntimeException(e)
+            throw KotlinLanguageDefinition.KotlinRuntimeException(e, ctx.file)
         } finally {
             ctx.releaseBoundEventIfPresent(Thread.currentThread())
             ctx.unbindThread(Thread.currentThread())
@@ -160,7 +160,7 @@ private class KotlinMethodWrapper<T : Any, U : Any, R : Any>(ctx: KotlinScriptCo
             }
             return (fn as (T, U) -> R)(p0, p1)
         } catch (e: Throwable) {
-            throw RuntimeException(e)
+            throw KotlinLanguageDefinition.KotlinRuntimeException(e, ctx.file)
         } finally {
             ctx.releaseBoundEventIfPresent(Thread.currentThread())
             ctx.unbindThread(Thread.currentThread())
@@ -180,7 +180,7 @@ private class KotlinMethodWrapper<T : Any, U : Any, R : Any>(ctx: KotlinScriptCo
             }
             return (fn as (T) -> Boolean)(p0)
         } catch (e: Throwable) {
-            throw RuntimeException(e)
+            throw KotlinLanguageDefinition.KotlinRuntimeException(e, ctx.file)
         } finally {
             ctx.releaseBoundEventIfPresent(Thread.currentThread())
             ctx.unbindThread(Thread.currentThread())
@@ -200,7 +200,7 @@ private class KotlinMethodWrapper<T : Any, U : Any, R : Any>(ctx: KotlinScriptCo
             }
             return (fn as (T, U) -> Boolean)(p0, p1)
         } catch (e: Throwable) {
-            throw RuntimeException(e)
+            throw KotlinLanguageDefinition.KotlinRuntimeException(e, ctx.file)
         } finally {
             ctx.releaseBoundEventIfPresent(Thread.currentThread())
             ctx.unbindThread(Thread.currentThread())
@@ -219,7 +219,7 @@ private class KotlinMethodWrapper<T : Any, U : Any, R : Any>(ctx: KotlinScriptCo
             try {
                 (fn as () -> Unit)()
             } catch (e: Throwable) {
-                Core.getInstance().profile.logError(e)
+                Core.getInstance().profile.logError(KotlinLanguageDefinition.KotlinRuntimeException(e, ctx.file))
             } finally {
                 ctx.releaseBoundEventIfPresent(Thread.currentThread())
                 ctx.unbindThread(Thread.currentThread())
@@ -241,7 +241,7 @@ private class KotlinMethodWrapper<T : Any, U : Any, R : Any>(ctx: KotlinScriptCo
             }
             return (fn as () -> R)()
         } catch (e: Throwable) {
-            throw RuntimeException(e)
+            throw KotlinLanguageDefinition.KotlinRuntimeException(e, ctx.file)
         } finally {
             ctx.releaseBoundEventIfPresent(Thread.currentThread())
             ctx.unbindThread(Thread.currentThread())
@@ -261,7 +261,7 @@ private class KotlinMethodWrapper<T : Any, U : Any, R : Any>(ctx: KotlinScriptCo
             }
             return (fn as (T, T) -> Int)(o1, o2)
         } catch (e: Throwable) {
-            throw RuntimeException(e)
+            throw KotlinLanguageDefinition.KotlinRuntimeException(e, ctx.file)
         } finally {
             ctx.releaseBoundEventIfPresent(Thread.currentThread())
             ctx.unbindThread(Thread.currentThread())

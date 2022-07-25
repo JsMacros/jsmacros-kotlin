@@ -40,6 +40,7 @@ class ProfileStub(runner: Core<*, *>, logger: Logger) : BaseProfile(runner, logg
     }
 
     override fun logError(ex: Throwable?) {
+        runner.wrapException(ex)
         LOGGER.error("", ex)
     }
 

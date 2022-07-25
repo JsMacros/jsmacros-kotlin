@@ -49,7 +49,11 @@ class KotlinLanguageDefinition(extension: Extension, runner: Core<*, *>) :
         internalExec(ctx, event) { host, compConf, evalConf ->
             val ret = host.eval(ctx.ctx.file!!.toScriptSource(), compConf, evalConf)
             ret.onFailure {
-                onFail(it)
+                throw KotlinCompileException(it)
+            }
+            val retVal = ret.valueOrThrow().returnValue
+            if (retVal is ResultValue.Error) {
+                throw KotlinRuntimeException(retVal.error, ctx.ctx.file)
             }
         }
     }
@@ -58,26 +62,19 @@ class KotlinLanguageDefinition(extension: Extension, runner: Core<*, *>) :
         internalExec(ctx, event) { host, compConf, evalConf ->
             val ret = host.eval(script.toScriptSource(), compConf, evalConf)
             ret.onFailure {
-                onFail(it)
+                throw KotlinCompileException(it)
+            }
+            val retVal = ret.valueOrThrow().returnValue
+            if (retVal is ResultValue.Error) {
+                throw KotlinRuntimeException(retVal.error, ctx.ctx.file)
             }
         }
-    }
-
-    private fun <R>onFail(it: ResultWithDiagnostics<R>) {
-        var reports = mutableListOf<String>()
-        var exceptions = mutableListOf<Throwable>()
-        for (report in it.reports) {
-            if (report.exception != null) {
-                exceptions.add(report.exception!!)
-                reports.add(report.toString())
-            } else {
-                reports += report.toString()
-            }
-        }
-        throw RuntimeException("Kotlin script failed:\n        ${reports.joinToString("\n        ")}", exceptions.firstOrNull())
     }
 
     override fun createContext(p0: BaseEvent?, p1: File?): KotlinScriptContext {
         return KotlinScriptContext(p0, p1)
     }
+
+    class KotlinCompileException(val resultWithDiagnostics: ResultWithDiagnostics<*>) : Exception()
+    class KotlinRuntimeException(val error: Throwable, val file: File?) : Exception(error)
 }
